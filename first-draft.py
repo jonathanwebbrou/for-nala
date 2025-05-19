@@ -114,6 +114,63 @@ def update_csv(csv_df, card_data, csv_path):
     csv_df.to_csv(csv_path, index=False)
     return csv_df
 
+def reduce_glare(image):
+    # Convert to HSV color space
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    # Detect potential glare (high value, low saturation)
+    mask = cv2.inRange(hsv, (0, 0, 200), (255, 30, 255))
+    
+    # Apply inpainting to glare areas
+    result = cv2.inpaint(image, mask, 3, cv2.INPAINT_TELEA)
+    return result
+
+def enhance_image(image):
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Apply CLAHE to L channel
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced_l = clahe.apply(l)
+    
+    # Merge channels and convert back to BGR
+    enhanced_lab = cv2.merge((enhanced_l, a, b))
+    enhanced_image = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+    return enhanced_image
+
+def capture_multiple_frames(cap, num_frames=5, delay=0.3):
+    frames = []
+    for _ in range(num_frames):
+        ret, frame = cap.read()
+        if ret:
+            frames.append(frame)
+            cv2.imshow('Capturing Multiple Frames', frame)
+            cv2.waitKey(1)
+            time.sleep(delay)  # Wait between captures
+    
+    return frames
+
+def select_best_frame(frames):
+    # Score each frame based on glare/blur
+    scores = []
+    for frame in frames:
+        # Calculate glare score
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, (0, 0, 200), (255, 30, 255))
+        glare_score = cv2.countNonZero(mask)
+        
+        # Calculate blur score (lower is better)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+        
+        # Combined score (lower is better)
+        scores.append(glare_score - blur_score*10)
+    
+    # Return the frame with lowest score (least glare, least blur)
+    best_idx = scores.index(min(scores))
+    return frames[best_idx]
+
 # Main function to capture image from webcam and process it
 def main():
     csv_path = "yugioh_collection.csv"
@@ -126,35 +183,47 @@ def main():
     os.makedirs('captured_cards', exist_ok=True)
     
     print("Press 's' to scan a card, 'q' to quit")
+
+    # Add a glare handling mode
+    handling_glare = False
     
     while True:
         # Capture frame from webcam
         ret, frame = cap.read()
         
+        # Apply real-time preprocessing for display
+        display_frame = frame.copy()
+        if handling_glare:
+            display_frame = enhance_image(display_frame)
+            cv2.putText(display_frame, "GLARE REDUCTION ON", (10, 30), 
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        
         # Display the frame
-        cv2.imshow('Yugioh Card Scanner', frame)
+        cv2.imshow('Yugioh Card Scanner', display_frame)
         
         # Wait for key press
         key = cv2.waitKey(1) & 0xFF
         
         # 's' key to scan card
         if key == ord('s'):
-            # Save the current frame as an image
+            if handling_glare:
+                # Capture multiple frames and select best
+                frames = capture_multiple_frames(cap, num_frames=5)
+                best_frame = select_best_frame(frames)
+                processed_frame = reduce_glare(best_frame)
+                processed_frame = enhance_image(processed_frame)
+            else:
+                processed_frame = frame.copy()
+            
+            # Save the processed frame
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             image_path = f"captured_cards/card_{timestamp}.jpg"
-            cv2.imwrite(image_path, frame)
-            print(f"Image saved to {image_path}")
-            
-            # Process the image to identify the card
-            print("Identifying card...")
-            card_data = identify_card(image_path)
-            
-            if card_data:
-                print(f"Card identified: {card_data.get('Card Name', 'Unknown')}")
-                # Update the CSV with the new card data
-                csv_df = update_csv(csv_df, card_data, csv_path)
-            else:
-                print("Failed to identify card")
+            cv2.imwrite(image_path, processed_frame)
+
+                # 'g' key to toggle glare reduction mode
+        elif key == ord('g'):
+            handling_glare = not handling_glare
+            print(f"Glare reduction: {'ON' if handling_glare else 'OFF'}")
         
         # 'q' key to quit
         elif key == ord('q'):
@@ -166,3 +235,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
