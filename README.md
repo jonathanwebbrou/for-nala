@@ -1,10 +1,10 @@
-# Yugioh Card Scanner
+# Card Scanner
 
-A Python application that uses computer vision and AI to scan Yugioh cards via webcam and automatically update a collection CSV file.
+A Python application that uses computer vision and AI to scan cards via webcam and automatically update a collection CSV file.
 
 ## Description
 
-This tool helps Yugioh collectors maintain an accurate inventory of their cards by:
+This tool helps card collectors maintain an accurate inventory of their cards by:
 - Capturing card images through a webcam
 - Using AI (via Ollama) to identify card details (name, set code, rarity, type)
 - Automatically updating a CSV inventory with the scanned cards
@@ -39,21 +39,21 @@ pip install opencv-python pandas requests
 1. Place your existing CSV file (if any) in the same directory as the script
 2. Run the script:
    ```
-   python yugioh_scanner.py
+   python card_scanner.py
    ```
-3. Point your webcam at a Yugioh card
+3. Point your webcam at a card
 4. Press 's' to scan and identify the card
 5. Press 'q' to quit the application
 
 The script will:
 - Save captured images to a 'captured_cards' folder
-- Update the 'yugioh_collection.csv' file with new card data
+- Update the 'card_collection.csv' file with new card data
 - Increment the quantity for cards already in the collection
 
 ## Potential Improvements
 
 ### Card Value Integration
-- Connect to a Yugioh pricing API (like TCGPlayer or YugiohPrices)
+- Connect to a card pricing API (like TCGPlayer or cardPrices)
 - Automatically fetch and update current market values for cards
 
 ### Image Enhancement
